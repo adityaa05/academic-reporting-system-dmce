@@ -11,7 +11,7 @@ from app.models.domain import DailyReport, Task
 from app.schemas.payload import OperationalDomain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-import os
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -73,9 +73,9 @@ async def stream_department_aggregation(db: AsyncSession = Depends(get_db)):
     combined_reports = "\n".join(reports)
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model=settings.DEFAULT_MODEL,
         temperature=0.2,
-        google_api_key=os.environ.get("GOOGLE_API_KEY"),
+        google_api_key=settings.GOOGLE_API_KEY,
     )
 
     prompt = ChatPromptTemplate.from_messages(

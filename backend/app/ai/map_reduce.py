@@ -6,7 +6,7 @@ from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
-import os
+from app.core.config import settings
 
 
 class MapReduceState(TypedDict):
@@ -26,9 +26,9 @@ async def map_node(state: MapReduceState) -> dict:
     Designed to run concurrently across multiple reports.
     """
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model=settings.DEFAULT_MODEL,
         temperature=0.1,
-        google_api_key=os.environ.get("GOOGLE_API_KEY"),
+        google_api_key=settings.GOOGLE_API_KEY,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -56,9 +56,9 @@ async def reduce_node(state: MapReduceState) -> dict:
     Synthesizes the accumulated summaries into a cohesive departmental overview.
     """
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model=settings.DEFAULT_MODEL,
         temperature=0.2,
-        google_api_key=os.environ.get("GOOGLE_API_KEY"),
+        google_api_key=settings.GOOGLE_API_KEY,
     )
 
     prompt = ChatPromptTemplate.from_messages(

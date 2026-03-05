@@ -4,7 +4,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from app.schemas.payload import DailySummaryReport
 from app.ai.state import ReportingState
-import os
+from app.core.config import settings
 
 
 def summarization_node(state: ReportingState) -> dict:
@@ -13,9 +13,9 @@ def summarization_node(state: ReportingState) -> dict:
     for administrative review.
     """
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model=settings.DEFAULT_MODEL,
         temperature=0.2,
-        google_api_key=os.environ.get("GOOGLE_API_KEY"),
+        google_api_key=settings.GOOGLE_API_KEY,
     )
 
     structured_llm = llm.with_structured_output(DailySummaryReport)

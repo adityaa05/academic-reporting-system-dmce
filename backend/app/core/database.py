@@ -1,17 +1,11 @@
 # backend/app/core/database.py
 
-import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-
-# Retrieve the connection string from environment variables
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:password@localhost:5432/academic_reports",
-)
+from app.core.config import settings
 
 # Initialize the asynchronous SQLAlchemy engine
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(settings.DATABASE_URL, echo=False)
 
 # Configure the session factory
 AsyncSessionLocal = async_sessionmaker(
