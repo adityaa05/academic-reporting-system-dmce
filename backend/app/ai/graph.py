@@ -7,19 +7,12 @@ from app.ai.state import ReportingState
 # Import node execution logic
 from app.ai.nodes.intake import intake_node
 from app.ai.nodes.summarizer import summarization_node
-
-
-def dispatch_node(state: ReportingState) -> dict:
-    """
-    Executes the database insertion of the finalized, approved report.
-    Implementation pending database setup.
-    """
-    return {"db_insertion_status": "SUCCESS"}
+from app.ai.nodes.dispatch import dispatch_node
 
 
 def route_post_summarization(state: ReportingState) -> str:
     """
-    Evaluates human-in-the-loop validation status to determine execution path.
+    Evaluates human-in-the-loop validation status to determine the execution path.
     """
     if state.get("is_approved"):
         return "dispatch"
