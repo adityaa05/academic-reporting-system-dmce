@@ -3,22 +3,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.core.database import engine, Base
 
-# Import models to ensure they are registered with SQLAlchemy Base
+from app.core.database import engine, Base
 from app.models import domain
+from app.api.routes import router as api_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manage application startup and shutdown events.
-    Executes table creation if they do not exist.
-    """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    # Teardown logic occurs here
 
 
 app = FastAPI(
@@ -40,6 +35,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register the API routes
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/health")
