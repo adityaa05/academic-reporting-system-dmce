@@ -20,9 +20,14 @@ class Settings(BaseSettings):
     # Database Configuration
     DATABASE_URL: str = "postgresql+asyncpg://adityaa:@localhost:5432/reporting_db"
 
+    # Authentication Configuration
+    SECRET_KEY: str = "your-secret-key-change-in-production-min-32-chars-long"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 days
+
     # Environment file loading
     model_config = SettingsConfigDict(
-        env_file=".env", 
+        env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore" # Ignore extra env vars to prevent validation errors
     )

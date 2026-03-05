@@ -1,0 +1,11 @@
+INSTRUCTIONS: Place College Logo Here
+
+Please save the DMCE college logo (image #5 you provided) as:
+  dmce-logo.png
+
+This file should be placed in this same directory:
+  frontend/public/images/dmce-logo.png
+
+The logo should be in PNG format for best quality.
+
+If the logo file is not found, a fallback blue circle with "DMCE" text will be shown instead.

@@ -47,9 +47,9 @@ class DailySummaryReport(BaseModel):
 class RawTaskInput(BaseModel):
     """
     Schema for receiving raw task text from the frontend.
+    Professor ID is extracted from JWT token, not from payload.
     """
 
-    professor_id: str = Field(..., description="Unique identifier for the professor.")
     raw_input: str = Field(
         ..., description="The unstructured text describing the completed task."
     )
@@ -58,9 +58,9 @@ class RawTaskInput(BaseModel):
 class ReportApproval(BaseModel):
     """
     Schema for receiving the HITL approval signal from the frontend.
+    Professor ID is extracted from JWT token, not from payload.
     """
 
-    professor_id: str = Field(..., description="Unique identifier for the professor.")
     is_approved: bool = Field(
         ..., description="Boolean indicating if the draft report is validated."
     )

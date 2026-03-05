@@ -24,6 +24,8 @@ class Professor(Base):
 
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
     department = Column(String, nullable=False, default="IT")
     role = Column(String, nullable=False, default="FACULTY")
 
@@ -44,7 +46,7 @@ class DailyReport(Base):
     professor_id = Column(
         String, ForeignKey("professors.id"), nullable=False, index=True
     )
-    date_submitted = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    date_submitted = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     executive_summary = Column(Text, nullable=False)
 
     professor = relationship("Professor", back_populates="reports")

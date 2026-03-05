@@ -7,7 +7,10 @@ from contextlib import asynccontextmanager
 from app.core.database import engine, Base
 from app.models import domain
 from app.api.routes import router as logging_router
-from app.api.analytics import router as analytics_router  # Import the new router
+from app.api.analytics import router as analytics_router
+from app.api.auth import router as auth_router
+from app.api.admin import router as admin_router
+from app.api.simple_routes import router as simple_router
 
 
 @asynccontextmanager
@@ -38,8 +41,11 @@ app.add_middleware(
 )
 
 # Register all routing modules
-app.include_router(logging_router, prefix="/api/v1")
-app.include_router(analytics_router, prefix="/api/v1")  # Register analytics
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(logging_router, prefix="/api/v1", tags=["Reports"])
+app.include_router(simple_router, prefix="/api/v1", tags=["Simple Reports"])
+app.include_router(analytics_router, prefix="/api/v1", tags=["Analytics"])
+app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 
 
 @app.get("/health")
