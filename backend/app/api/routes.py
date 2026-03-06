@@ -10,6 +10,8 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.institutional_context import get_institutional_context
+from app.core.input_sanitizer import get_sanitizer
 from app.schemas.payload import RawTaskInput, ReportApproval, DailySummaryReport
 from app.ai.graph import reporting_agent
 from app.api.dependencies import get_current_user
@@ -187,6 +189,19 @@ async def generate_formatted_report(
             detail="At least one task is required to generate a report.",
         )
 
+    # Sanitize and validate input tasks
+    sanitizer = get_sanitizer()
+    valid_tasks, rejected_tasks = sanitizer.sanitize_and_validate_tasks(payload.tasks)
+
+    if not valid_tasks:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No valid tasks found. Please provide meaningful task descriptions. Rejected: {rejected_tasks[:3]}",
+        )
+
+    if rejected_tasks:
+        print(f"\nWarning: {len(rejected_tasks)} tasks were filtered out due to low quality: {rejected_tasks}")
+
     # Initialize Gemini AI
     llm = ChatGoogleGenerativeAI(
         model=settings.DEFAULT_MODEL,
@@ -194,10 +209,16 @@ async def generate_formatted_report(
         google_api_key=settings.GOOGLE_API_KEY,
     )
 
+    # Get institutional context
+    context = get_institutional_context(department=current_user.department)
+    context_prompt = context.get_context_prompt()
+
     # Create prompt for formatting tasks
     prompt = ChatPromptTemplate.from_messages([
-        ("system", """
+        ("system", f"""
 You are a helpful assistant that formats faculty work logs into clear, professional reports.
+
+{context_prompt}
 
 Given a list of simple one-line task descriptions, format each one into:
 - A clear, descriptive title (what was done)
@@ -206,29 +227,31 @@ Given a list of simple one-line task descriptions, format each one into:
 Use simple, clear language. No fancy words. Write as if explaining to a colleague.
 
 For each task, respond with JSON in this exact format:
-{{
+{{{{
   "title": "Task 01: [Clear Title Here]",
   "description": "[1-2 sentences explaining what was done in simple words]"
-}}
+}}}}
 
 IMPORTANT:
 - Number tasks as Task 01, Task 02, Task 03, etc.
 - Keep language simple and clear
 - Write in first person ("I taught...", "I reviewed...")
-- Expand abbreviations (TE = Third Year Engineering, SE = Second Year, etc.)
+- ONLY expand abbreviations that are in the INSTITUTIONAL CONTEXT above
+- For unknown abbreviations or terms, keep them EXACTLY as written - DO NOT guess or make up expansions
 - Be specific but concise
+- When you see abbreviations not in the context, treat them as proper nouns and keep them unchanged
 """),
         ("user", """
 Format these tasks into a proper report:
 
-{tasks}
+{{tasks}}
 
 Return a JSON array of formatted tasks.
 """)
     ])
 
-    # Format tasks for the prompt
-    tasks_text = "\n".join([f"{i+1}. {task}" for i, task in enumerate(payload.tasks)])
+    # Format tasks for the prompt (use sanitized valid_tasks)
+    tasks_text = "\n".join([f"{i+1}. {task}" for i, task in enumerate(valid_tasks)])
 
     try:
         # Get AI response
@@ -252,7 +275,7 @@ Return a JSON array of formatted tasks.
                     "title": f"Task {str(i+1).zfill(2)}: {task[:50]}",
                     "description": f"Completed: {task}"
                 }
-                for i, task in enumerate(payload.tasks)
+                for i, task in enumerate(valid_tasks)
             ]
 
         formatted_tasks = [FormattedTask(**item) for item in formatted_data]
@@ -260,7 +283,7 @@ Return a JSON array of formatted tasks.
         # Cache the formatted report for this professor
         _formatted_reports_cache[current_user.id] = {
             "tasks": formatted_tasks,
-            "raw_tasks": payload.tasks,
+            "raw_tasks": valid_tasks,
         }
 
         return FormattedReportResponse(formatted_tasks=formatted_tasks)
@@ -273,12 +296,12 @@ Return a JSON array of formatted tasks.
                 title=f"Task {str(i+1).zfill(2)}: {task[:50]}",
                 description=task
             )
-            for i, task in enumerate(payload.tasks)
+            for i, task in enumerate(valid_tasks)
         ]
 
         _formatted_reports_cache[current_user.id] = {
             "tasks": formatted_tasks,
-            "raw_tasks": payload.tasks,
+            "raw_tasks": valid_tasks,
         }
 
         return FormattedReportResponse(formatted_tasks=formatted_tasks)

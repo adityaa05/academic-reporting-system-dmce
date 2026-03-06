@@ -7,6 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from app.core.config import settings
+from app.core.institutional_context import get_institutional_context
 
 
 class MapReduceState(TypedDict):
@@ -31,13 +32,22 @@ async def map_node(state: MapReduceState) -> dict:
         google_api_key=settings.GOOGLE_API_KEY,
     )
 
+    # Get institutional context
+    context = get_institutional_context()
+    context_prompt = context.get_context_prompt()
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                "Extract the core academic and administrative achievements from the provided report.",
+                f"""Extract the core academic and administrative achievements from the provided report.
+
+{context_prompt}
+
+CRITICAL: Preserve all terminology, abbreviations, and committee names EXACTLY as they appear in the report.
+DO NOT expand or modify terms unless they are in the institutional context above.""",
             ),
-            ("user", "{report}"),
+            ("user", "{{report}}"),
         ]
     )
 
@@ -61,17 +71,26 @@ async def reduce_node(state: MapReduceState) -> dict:
         google_api_key=settings.GOOGLE_API_KEY,
     )
 
+    # Get institutional context
+    context = get_institutional_context()
+    context_prompt = context.get_context_prompt()
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """
+                f"""
         You are an administrative AI assistant compiling a departmental report for the Head of Department.
         Synthesize the following individual faculty summaries into a comprehensive, unified report.
         Highlight operational bottlenecks, total research output, and pedagogical milestones.
+
+        {context_prompt}
+
+        CRITICAL: Preserve all terminology, abbreviations, and committee names EXACTLY as they appear.
+        Only use expansions from the institutional context. Keep unknown terms as-is without hallucination.
         """,
             ),
-            ("user", "Faculty Summaries:\n{summaries}"),
+            ("user", "Faculty Summaries:\n{{summaries}}"),
         ]
     )
 

@@ -19,6 +19,7 @@ import { UserManagement } from './pages/hod/UserManagement';
 
 // Shared Pages
 import { Profile } from './pages/shared/Profile';
+import { AcademicReportingSystem } from './pages/AcademicReportingSystem';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +55,7 @@ function App() {
               )
             }
           />
+          <Route path={ROUTES.PREVIEW} element={<AcademicReportingSystem />} />
 
           {/* Faculty Routes */}
           <Route

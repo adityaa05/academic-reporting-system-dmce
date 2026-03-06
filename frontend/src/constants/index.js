@@ -30,4 +30,5 @@ export const ROUTES = {
   HOD_ANALYTICS: '/hod/analytics',
   HOD_USERS: '/hod/users',
   HOD_PROFILE: '/hod/profile',
+  PREVIEW: '/preview',
 };

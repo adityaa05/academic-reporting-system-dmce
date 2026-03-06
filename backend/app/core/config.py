@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     DEFAULT_MODEL: str = "gemini-2.5-flash"
 
     # Database Configuration
-    DATABASE_URL: str = "postgresql+asyncpg://adityaa:@localhost:5432/reporting_db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./reporting.db"
 
     # Authentication Configuration
     SECRET_KEY: str = "your-secret-key-change-in-production-min-32-chars-long"
