@@ -99,7 +99,7 @@ async def submit_simple_report(
     for idx, task in enumerate(payload.tasks, 1):
         new_task = TaskModel(
             report_id=new_report.id,
-            domain=f"Task {idx:02d}",  # Store task number as domain
+            domain=None,  # Not used anymore
             action=task.title,
             metric=task.description,
         )
@@ -231,3 +231,47 @@ async def get_new_reports_count(
         "date": today,
         "new_reports": count,
     }
+
+
+# Draft tasks storage (in-memory, could be moved to Redis/DB for production)
+_draft_tasks_cache = {}
+
+
+class DraftTask(BaseModel):
+    text: str
+    completed: bool = False
+
+
+class DraftTasksList(BaseModel):
+    tasks: List[DraftTask]
+
+
+@router.post("/simple/tasks/draft/save")
+async def save_draft_tasks(
+    payload: DraftTasksList,
+    current_user: Professor = Depends(get_current_user),
+):
+    """
+    Save draft tasks for the current user (auto-save throughout the day).
+    """
+    _draft_tasks_cache[current_user.id] = {
+        "tasks": [task.dict() for task in payload.tasks],
+        "last_updated": datetime.now(timezone.utc),
+    }
+
+    return {"status": "saved", "count": len(payload.tasks)}
+
+
+@router.get("/simple/tasks/draft/load")
+async def load_draft_tasks(
+    current_user: Professor = Depends(get_current_user),
+):
+    """
+    Load draft tasks for the current user.
+    """
+    draft_data = _draft_tasks_cache.get(current_user.id)
+
+    if not draft_data:
+        return {"tasks": []}
+
+    return {"tasks": draft_data["tasks"]}

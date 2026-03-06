@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Send, CheckCircle2, Trash2 } from 'lucide-react';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -9,6 +9,8 @@ import { useAuthStore } from '../../store/authStore';
 import { reportService } from '../../services/api';
 import { getGreeting } from '../../utils/helpers';
 
+const STORAGE_KEY = 'faculty_draft_tasks';
+
 export const FacultyDashboard = () => {
   const { user } = useAuthStore();
   const [tasks, setTasks] = useState([]);
@@ -18,6 +20,76 @@ export const FacultyDashboard = () => {
   const [draftReport, setDraftReport] = useState(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isDispatchingReport, setIsDispatchingReport] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load tasks from localStorage and backend on mount
+  useEffect(() => {
+    const loadTasks = async () => {
+      // Try localStorage first (faster)
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          setTasks(JSON.parse(stored));
+        } catch (e) {
+          console.error('Error parsing stored tasks:', e);
+        }
+      }
+
+      // Then sync with backend
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/simple/tasks/draft/load`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.tasks && data.tasks.length > 0) {
+            const taskTexts = data.tasks.map(t => t.text);
+            setTasks(taskTexts);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(taskTexts));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading draft tasks from backend:', error);
+      }
+    };
+
+    loadTasks();
+  }, []);
+
+  // Auto-save tasks whenever they change
+  useEffect(() => {
+    if (tasks.length === 0) return;
+
+    const saveTasks = async () => {
+      // Save to localStorage immediately
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+
+      // Debounced save to backend
+      setIsSaving(true);
+      try {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/v1/simple/tasks/draft/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            tasks: tasks.map(text => ({ text, completed: false })),
+          }),
+        });
+      } catch (error) {
+        console.error('Error saving draft tasks to backend:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    const timeout = setTimeout(saveTasks, 1000); // Debounce 1 second
+    return () => clearTimeout(timeout);
+  }, [tasks]);
 
   const handleAddTask = () => {
     if (!taskInput.trim()) return;
@@ -39,7 +111,6 @@ export const FacultyDashboard = () => {
 
     setIsGeneratingReport(true);
     try {
-      // Send tasks to backend to generate formatted report using Gemini
       const draft = await reportService.generateFormattedReport(tasks);
       setDraftReport(draft);
       setShowConfirmModal(true);
@@ -58,6 +129,8 @@ export const FacultyDashboard = () => {
       setShowConfirmModal(false);
       setDraftReport(null);
       setTasks([]);
+      // Clear localStorage after successful submission
+      localStorage.removeItem(STORAGE_KEY);
       alert('Report submitted successfully!');
     } catch (error) {
       const errorMsg = error.response?.data?.detail || 'Error submitting report. Please try again.';
@@ -70,21 +143,21 @@ export const FacultyDashboard = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-primary">
-            Hey {user?.name?.split(' ')[1]},
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900">
+            Hey {user?.name?.split(' ')[0]},
           </h1>
-          <p className="text-gray-500 text-lg mt-1">{getGreeting()}!</p>
+          <p className="text-gray-600 text-base sm:text-lg mt-1">{getGreeting()}!</p>
         </div>
 
         {/* Date Display */}
-        <Card className="mb-6">
+        <Card className="mb-5 sm:mb-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Today's Date</p>
-              <p className="text-lg font-semibold text-primary mt-1">
+              <p className="text-base sm:text-lg font-medium text-gray-900 mt-1">
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -93,11 +166,11 @@ export const FacultyDashboard = () => {
                 })}
               </p>
             </div>
-            <div className="bg-gray-100 rounded-xl px-4 py-3 text-center">
-              <p className="text-2xl font-bold text-primary">
+            <div className="bg-gray-50 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-center border border-gray-200">
+              <p className="text-xl sm:text-2xl font-semibold text-gray-900">
                 {new Date().getDate()}
               </p>
-              <p className="text-xs text-gray-500 uppercase">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">
                 {new Date().toLocaleDateString('en-US', { month: 'short' })}
               </p>
             </div>
@@ -105,40 +178,53 @@ export const FacultyDashboard = () => {
         </Card>
 
         {/* Task Summary */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-5 sm:mb-6">
           <Card>
-            <p className="text-sm text-gray-500 mb-1">Tasks Logged</p>
-            <p className="text-3xl font-bold text-primary">{tasks.length}</p>
+            <p className="text-xs sm:text-sm text-gray-500 mb-1">Tasks Logged</p>
+            <p className="text-2xl sm:text-3xl font-semibold text-gray-900">{tasks.length}</p>
           </Card>
           <Card>
-            <p className="text-sm text-gray-500 mb-1">Status</p>
-            <p className="text-lg font-semibold text-green-600">
-              {tasks.length > 0 ? 'In Progress' : 'No Tasks'}
-            </p>
+            <p className="text-xs sm:text-sm text-gray-500 mb-1">Status</p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className={`w-2 h-2 rounded-full ${tasks.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`} />
+              <p className="text-sm sm:text-base font-medium text-gray-900">
+                {tasks.length > 0 ? 'In Progress' : 'No Tasks'}
+              </p>
+            </div>
           </Card>
         </div>
 
+        {/* Auto-save indicator */}
+        {isSaving && (
+          <div className="mb-4 text-xs text-gray-500 text-right">
+            Saving...
+          </div>
+        )}
+
         {/* Tasks List */}
-        <Card className="min-h-[400px]">
+        <Card className="min-h-[350px] sm:min-h-[400px]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-primary">Today's Activities</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Today's Activities</h3>
             <Button
               size="sm"
               onClick={() => setShowInputModal(true)}
-              icon={<Plus size={18} />}
+              icon={<Plus size={16} />}
+              className="text-sm"
             >
-              Add Task
+              <span className="hidden sm:inline">Add Task</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           </div>
 
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             {tasks.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-400 mb-4">No tasks logged yet</p>
+              <div className="text-center py-12 sm:py-16">
+                <p className="text-gray-400 mb-4 text-sm sm:text-base">No tasks logged yet</p>
                 <Button
                   variant="secondary"
                   onClick={() => setShowInputModal(true)}
                   icon={<Plus size={18} />}
+                  className="text-sm sm:text-base"
                 >
                   Log Your First Task
                 </Button>
@@ -147,15 +233,15 @@ export const FacultyDashboard = () => {
               tasks.map((task, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100"
+                  className="flex items-start gap-3 bg-gray-50 p-3 sm:p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
                 >
-                  <div className="flex-shrink-0">
-                    <CheckCircle2 size={20} className="text-primary" />
+                  <div className="flex-shrink-0 mt-0.5">
+                    <CheckCircle2 size={18} className="text-green-600" />
                   </div>
-                  <p className="flex-1 text-sm text-gray-800">{task}</p>
+                  <p className="flex-1 text-sm text-gray-800 leading-relaxed break-words">{task}</p>
                   <button
                     onClick={() => handleDeleteTask(index)}
-                    className="flex-shrink-0 text-red-500 hover:text-red-700 transition-colors"
+                    className="flex-shrink-0 text-gray-400 hover:text-red-600 transition-colors p-1"
                     title="Delete task"
                   >
                     <Trash2 size={16} />
@@ -166,14 +252,14 @@ export const FacultyDashboard = () => {
           </CardContent>
 
           {tasks.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-gray-100">
+            <div className="mt-6 pt-6 border-t border-gray-200">
               <Button
                 variant="primary"
                 size="lg"
                 className="w-full"
                 onClick={handleGenerateReport}
                 loading={isGeneratingReport}
-                icon={<Send size={20} />}
+                icon={<Send size={18} />}
               >
                 Generate & Submit Report
               </Button>
@@ -190,7 +276,7 @@ export const FacultyDashboard = () => {
       >
         <Input
           label="What did you do?"
-          placeholder="E.g., Taught DBMS lecture to TE students"
+          placeholder="E.g., Completed theory lectures"
           value={taskInput}
           onChange={(e) => setTaskInput(e.target.value)}
           onKeyPress={(e) => {
@@ -200,7 +286,7 @@ export const FacultyDashboard = () => {
           }}
           autoFocus
         />
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-gray-500 mt-2 leading-relaxed">
           Just type a quick note. AI will format it into a proper report when you submit.
         </p>
         <div className="flex gap-3 mt-6">
@@ -234,14 +320,14 @@ export const FacultyDashboard = () => {
       >
         {draftReport && (
           <>
-            <div className="bg-gray-50 rounded-xl p-4 mb-6 max-h-96 overflow-y-auto">
-              <p className="text-sm font-semibold text-gray-700 mb-4">
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 max-h-96 overflow-y-auto border border-gray-200">
+              <p className="text-sm font-medium text-gray-700 mb-4">
                 AI-Generated Report Preview:
               </p>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {draftReport.formatted_tasks && draftReport.formatted_tasks.map((task, index) => (
-                  <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
-                    <h4 className="text-sm font-semibold text-primary mb-2">
+                  <div key={index} className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">
                       {task.title}
                     </h4>
                     <p className="text-sm text-gray-700 leading-relaxed">
@@ -252,8 +338,8 @@ export const FacultyDashboard = () => {
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-              <p className="text-sm text-blue-800">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-blue-800 leading-relaxed">
                 This AI-generated report will be submitted to your HOD. Review it carefully before confirming.
               </p>
             </div>

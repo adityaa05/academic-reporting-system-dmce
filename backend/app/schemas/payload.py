@@ -14,14 +14,14 @@ class OperationalDomain(str, Enum):
 
 
 class CategorizedTask(BaseModel):
-    domain: OperationalDomain = Field(
-        ..., description="The classified operational domain."
+    domain: Optional[OperationalDomain] = Field(
+        None, description="Optional operational domain (deprecated, not used)."
     )
     action: str = Field(
-        ..., description="A concise description of the completed action."
+        ..., description="Task title or description of completed action."
     )
     metric: Optional[str] = Field(
-        None, description="Quantifiable metric, such as duration or count."
+        None, description="Additional details or description."
     )
 
 

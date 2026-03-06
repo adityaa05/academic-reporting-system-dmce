@@ -10,7 +10,6 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.institutional_context import get_institutional_context
 from app.core.input_sanitizer import get_sanitizer
 from app.schemas.payload import RawTaskInput, ReportApproval, DailySummaryReport
 from app.ai.graph import reporting_agent
@@ -205,58 +204,64 @@ async def generate_formatted_report(
     # Initialize Gemini AI
     llm = ChatGoogleGenerativeAI(
         model=settings.DEFAULT_MODEL,
-        temperature=0.3,
+        temperature=0.25,  # Balanced - creative but controlled
         google_api_key=settings.GOOGLE_API_KEY,
     )
 
-    # Get institutional context
-    context = get_institutional_context(department=current_user.department)
-    context_prompt = context.get_context_prompt()
-
     # Create prompt for formatting tasks
     prompt = ChatPromptTemplate.from_messages([
-        ("system", f"""
-You are a helpful assistant that formats faculty work logs into clear, professional reports.
+        ("system", """You are a professional report formatter. Convert brief task notes into formatted entries.
 
-{context_prompt}
+IMPORTANT - JSON FORMAT:
+Return ONLY a JSON array of objects. Each object must have exactly 2 fields: "title" and "description".
 
-Given a list of simple one-line task descriptions, format each one into:
-- A clear, descriptive title (what was done)
-- A simple paragraph explanation (expanding on the task in plain English)
+CORRECT format:
+[
+  {{
+    "title": "Task 01: Your Title Here",
+    "description": "Your description here in first person."
+  }}
+]
 
-Use simple, clear language. No fancy words. Write as if explaining to a colleague.
+WRONG format (DO NOT use this):
+[{{"Task 01": {{"title": "...", "description": "..."}}}}]
 
-For each task, respond with JSON in this exact format:
-{{{{
-  "title": "Task 01: [Clear Title Here]",
-  "description": "[1-2 sentences explaining what was done in simple words]"
-}}}}
+FORMATTING RULES:
+- Title: Start with "Task 01:", "Task 02:", etc. then add a professional description
+- Description: 1-2 sentences in first person explaining what was done
+- Keep abbreviations as-is (IA, CSI, BE, GITS, etc.)
+- DO NOT invent tasks - only format what you're given
 
-IMPORTANT:
-- Number tasks as Task 01, Task 02, Task 03, etc.
-- Keep language simple and clear
-- Write in first person ("I taught...", "I reviewed...")
-- ONLY expand abbreviations that are in the INSTITUTIONAL CONTEXT above
-- For unknown abbreviations or terms, keep them EXACTLY as written - DO NOT guess or make up expansions
-- Be specific but concise
-- When you see abbreviations not in the context, treat them as proper nouns and keep them unchanged
-"""),
-        ("user", """
-Format these tasks into a proper report:
+EXAMPLES:
 
-{{tasks}}
+Input: "checked ia 1 papers"
+Output:
+[
+  {{
+    "title": "Task 01: Checked IA 1 Papers",
+    "description": "I reviewed and evaluated the IA 1 examination papers, checking student responses and preparing grades."
+  }}
+]
 
-Return a JSON array of formatted tasks.
-""")
+Input: "CSI award dist done"
+Output:
+[
+  {{
+    "title": "Task 01: Completed CSI Award Distribution",
+    "description": "I organized and completed the CSI award distribution ceremony for students."
+  }}
+]"""),
+        ("user", "Format these {task_count} task(s):\n\n{tasks}\n\nReturn a JSON array with {task_count} object(s). Each object needs 'title' and 'description' fields.")
     ])
 
     # Format tasks for the prompt (use sanitized valid_tasks)
     tasks_text = "\n".join([f"{i+1}. {task}" for i, task in enumerate(valid_tasks)])
+    task_count = len(valid_tasks)
 
     try:
         # Get AI response
         chain = prompt | llm
-        result = chain.invoke({"tasks": tasks_text})
+        result = chain.invoke({"tasks": tasks_text, "task_count": task_count})
 
         # Parse the AI response
         import json
@@ -264,19 +269,62 @@ Return a JSON array of formatted tasks.
 
         # Extract JSON from the response
         content = result.content
+        print(f"\n--- AI Response ---\n{content}\n--- End Response ---\n")
         # Try to find JSON array in the response
         json_match = re.search(r'\[.*\]', content, re.DOTALL)
         if json_match:
             formatted_data = json.loads(json_match.group())
+
+            # Fix wrong JSON format if AI returned nested structure
+            # Wrong: [{"Task 01": {"title": "...", "description": "..."}}]
+            # Right: [{"title": "Task 01: ...", "description": "..."}]
+            if formatted_data and isinstance(formatted_data[0], dict):
+                first_item = formatted_data[0]
+                # Check if it's the wrong nested format
+                if "title" not in first_item and "description" not in first_item:
+                    print("\n⚠️  Fixing wrong JSON format from AI...\n")
+                    fixed_data = []
+                    for item in formatted_data:
+                        # Extract the nested data
+                        for task_num, task_data in item.items():
+                            if isinstance(task_data, dict) and "title" in task_data:
+                                # Add "Task XX: " prefix if not present
+                                title = task_data["title"]
+                                if not title.startswith("Task"):
+                                    title = f"{task_num}: {title}"
+                                fixed_data.append({
+                                    "title": title,
+                                    "description": task_data["description"]
+                                })
+                    formatted_data = fixed_data
+
+            # CRITICAL VALIDATION: Ensure we got exactly the right number of tasks
+            if len(formatted_data) > task_count:
+                print(f"\n⚠️  WARNING: AI returned {len(formatted_data)} tasks but only {task_count} were provided!")
+                print(f"    Truncating to {task_count} tasks to prevent hallucination.\n")
+                # Truncate to the correct number
+                formatted_data = formatted_data[:task_count]
+            elif len(formatted_data) < task_count:
+                print(f"\n⚠️  WARNING: AI returned only {len(formatted_data)} tasks but {task_count} were provided!")
+                print(f"    Using fallback formatting for missing tasks.\n")
+                # Add missing tasks with fallback formatting
+                for i in range(len(formatted_data), task_count):
+                    task_text = valid_tasks[i]
+                    title = task_text.capitalize() if task_text else "Completed Task"
+                    formatted_data.append({
+                        "title": f"Task {str(i+1).zfill(2)}: {title[:60]}",
+                        "description": f"I completed the following work: {task_text}"
+                    })
         else:
-            # Fallback: create basic formatting
-            formatted_data = [
-                {
-                    "title": f"Task {str(i+1).zfill(2)}: {task[:50]}",
-                    "description": f"Completed: {task}"
-                }
-                for i, task in enumerate(valid_tasks)
-            ]
+            # Fallback: create basic formatting with improved descriptions
+            formatted_data = []
+            for i, task in enumerate(valid_tasks):
+                title = task.capitalize() if task else "Completed Task"
+                formatted_data.append({
+                    "title": f"Task {str(i+1).zfill(2)}: {title[:60]}",
+                    "description": f"I completed the following work: {task}"
+                })
+            print(f"\n⚠️  WARNING: Could not parse AI response, using fallback formatting\n")
 
         formatted_tasks = [FormattedTask(**item) for item in formatted_data]
 
@@ -290,14 +338,14 @@ Return a JSON array of formatted tasks.
 
     except Exception as e:
         print(f"\n--- FORMATTING ERROR: {str(e)} ---\n")
-        # Fallback formatting
-        formatted_tasks = [
-            FormattedTask(
-                title=f"Task {str(i+1).zfill(2)}: {task[:50]}",
-                description=task
-            )
-            for i, task in enumerate(valid_tasks)
-        ]
+        # Fallback formatting with improved descriptions
+        formatted_tasks = []
+        for i, task in enumerate(valid_tasks):
+            title = task.capitalize() if task else "Completed Task"
+            formatted_tasks.append(FormattedTask(
+                title=f"Task {str(i+1).zfill(2)}: {title[:60]}",
+                description=f"I completed the following work: {task}"
+            ))
 
         _formatted_reports_cache[current_user.id] = {
             "tasks": formatted_tasks,
@@ -359,9 +407,9 @@ async def dispatch_formatted_report(
     for task in formatted_tasks:
         new_task = TaskModel(
             report_id=new_report.id,
-            domain=task.title,  # Store full title in domain field
-            action=task.title,  # Store title in action
-            metric=task.description,  # Store description in metric
+            domain=None,  # Not used anymore
+            action=task.title,  # Task title
+            metric=task.description,  # Task description
         )
         db.add(new_task)
 

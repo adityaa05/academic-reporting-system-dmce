@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Card, CardTitle, CardContent } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/ui/Loading';
 import { analyticsService } from '../../services/api';
-import { DOMAIN_COLORS } from '../../constants';
 
 export const Analytics = () => {
   const [metrics, setMetrics] = useState(null);
@@ -42,15 +41,7 @@ export const Analytics = () => {
   }
 
   // Prepare data for charts
-  const domainData = stats?.top_domains.map(item => ({
-    name: item.domain,
-    value: item.count,
-    percentage: item.percentage,
-  })) || [];
-
   const weeklyData = stats?.weekly_trend || [];
-
-  const COLORS = Object.values(DOMAIN_COLORS);
 
   return (
     <AppLayout>
@@ -83,105 +74,19 @@ export const Analytics = () => {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Domain Distribution Pie Chart */}
-        <Card>
-          <CardTitle>Activity Domain Distribution</CardTitle>
-          <CardContent className="mt-4">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={domainData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percentage }) => `${name} ${percentage}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {domainData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 gap-6">
         {/* Weekly Trend Bar Chart */}
         <Card>
           <CardTitle>Weekly Submission Trend</CardTitle>
           <CardContent className="mt-4">
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
               <BarChart data={weeklyData}>
                 <XAxis dataKey="day" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="submissions" fill="#1a1a1a" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="submissions" fill="#111827" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Domain Breakdown Table */}
-        <Card className="lg:col-span-2">
-          <CardTitle>Detailed Activity Breakdown</CardTitle>
-          <CardContent className="mt-4">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                      Domain
-                    </th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">
-                      Task Count
-                    </th>
-                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">
-                      Percentage
-                    </th>
-                    <th className="py-3 px-4 text-sm font-semibold text-gray-700">
-                      Distribution
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {domainData.map((item, idx) => (
-                    <tr key={idx} className="border-b border-gray-100">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: COLORS[idx % COLORS.length] }}
-                          />
-                          <span className="font-medium text-gray-800">{item.name}</span>
-                        </div>
-                      </td>
-                      <td className="text-right py-3 px-4 text-gray-800 font-medium">
-                        {item.value}
-                      </td>
-                      <td className="text-right py-3 px-4 text-gray-600">
-                        {item.percentage}%
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="h-2 rounded-full"
-                            style={{
-                              width: `${item.percentage}%`,
-                              backgroundColor: COLORS[idx % COLORS.length],
-                            }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </CardContent>
         </Card>
       </div>

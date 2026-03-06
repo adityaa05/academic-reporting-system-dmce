@@ -7,7 +7,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
 from app.core.config import settings
-from app.core.institutional_context import get_institutional_context
 
 
 class MapReduceState(TypedDict):
@@ -32,22 +31,16 @@ async def map_node(state: MapReduceState) -> dict:
         google_api_key=settings.GOOGLE_API_KEY,
     )
 
-    # Get institutional context
-    context = get_institutional_context()
-    context_prompt = context.get_context_prompt()
-
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                f"""Extract the core academic and administrative achievements from the provided report.
+                """Extract the core achievements and completed work from the provided report.
 
-{context_prompt}
-
-CRITICAL: Preserve all terminology, abbreviations, and committee names EXACTLY as they appear in the report.
-DO NOT expand or modify terms unless they are in the institutional context above.""",
+CRITICAL: Preserve all terminology, abbreviations, and names EXACTLY as they appear in the report.
+DO NOT expand, modify, or interpret abbreviations - keep them as written.""",
             ),
-            ("user", "{{report}}"),
+            ("user", "{report}"),
         ]
     )
 
@@ -71,26 +64,20 @@ async def reduce_node(state: MapReduceState) -> dict:
         google_api_key=settings.GOOGLE_API_KEY,
     )
 
-    # Get institutional context
-    context = get_institutional_context()
-    context_prompt = context.get_context_prompt()
-
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                f"""
-        You are an administrative AI assistant compiling a departmental report for the Head of Department.
-        Synthesize the following individual faculty summaries into a comprehensive, unified report.
-        Highlight operational bottlenecks, total research output, and pedagogical milestones.
+                """
+        You are an administrative AI assistant compiling a departmental report.
+        Synthesize the following individual summaries into a comprehensive, unified report.
+        Highlight key patterns, achievements, and areas requiring attention.
 
-        {context_prompt}
-
-        CRITICAL: Preserve all terminology, abbreviations, and committee names EXACTLY as they appear.
-        Only use expansions from the institutional context. Keep unknown terms as-is without hallucination.
+        CRITICAL: Preserve all terminology, abbreviations, and names EXACTLY as they appear.
+        DO NOT expand or modify abbreviations - keep them as written in the original summaries.
         """,
             ),
-            ("user", "Faculty Summaries:\n{{summaries}}"),
+            ("user", "Summaries:\n{summaries}"),
         ]
     )
 

@@ -64,8 +64,8 @@ class Task(Base):
     report_id = Column(
         Integer, ForeignKey("daily_reports.id"), nullable=False, index=True
     )
-    domain = Column(SQLEnum(OperationalDomain), nullable=False)
-    action = Column(String, nullable=False)
-    metric = Column(String, nullable=True)
+    domain = Column(SQLEnum(OperationalDomain), nullable=True, default=None)  # Optional, not used
+    action = Column(String, nullable=False)  # Task title
+    metric = Column(String, nullable=True)  # Task description
 
     report = relationship("DailyReport", back_populates="tasks")

@@ -135,62 +135,39 @@ export const HODDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Activity Domains */}
-        <Card>
-          <CardTitle>Activity Distribution</CardTitle>
-          <CardContent className="mt-4">
-            <div className="space-y-4">
-              {stats?.top_domains.map((item) => (
-                <div key={item.domain}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      {item.domain}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {item.count} tasks ({item.percentage}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all"
-                      style={{ width: `${item.percentage}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Recent Submissions */}
         <Card>
           <CardTitle>Recent Submissions</CardTitle>
           <CardContent className="mt-4">
             <div className="space-y-3">
-              {stats?.recent_submissions.map((submission, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold">
-                      {submission.professor.charAt(0)}
+              {stats?.recent_submissions && stats.recent_submissions.length > 0 ? (
+                stats.recent_submissions.map((submission, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center font-bold">
+                        {submission.professor.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">
+                          {submission.professor}
+                        </p>
+                        <p className="text-xs text-gray-500">{submission.time}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {submission.professor}
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-primary">
+                        {submission.tasks}
                       </p>
-                      <p className="text-xs text-gray-500">{submission.time}</p>
+                      <p className="text-xs text-gray-500">tasks</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-primary">
-                      {submission.tasks}
-                    </p>
-                    <p className="text-xs text-gray-500">tasks</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No recent submissions</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -200,7 +177,7 @@ export const HODDashboard = () => {
           <CardTitle>Weekly Submission Trend</CardTitle>
           <CardContent className="mt-4">
             <div className="flex items-end justify-between gap-4 h-48">
-              {stats?.weekly_trend.map((day) => {
+              {stats?.weekly_trend && stats.weekly_trend.map((day) => {
                 const maxValue = Math.max(...stats.weekly_trend.map(d => d.submissions));
                 const height = (day.submissions / maxValue) * 100;
 

@@ -5,7 +5,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.schemas.payload import TaskList
 from app.ai.state import ReportingState
 from app.core.config import settings
-from app.core.institutional_context import get_institutional_context
 
 
 def intake_node(state: ReportingState) -> dict:
@@ -23,30 +22,25 @@ def intake_node(state: ReportingState) -> dict:
     # Enforce strict adherence to the TaskList schema
     structured_llm = llm.with_structured_output(TaskList)
 
-    # Get institutional context
-    context = get_institutional_context()
-    context_prompt = context.get_context_prompt()
-
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                f"""
-        You are an academic data parsing agent. Your objective is to extract completed professional tasks
+                """
+        You are a professional data parsing agent. Your objective is to extract completed tasks
         from the user's input and categorize them into the defined operational domains.
-
-        {context_prompt}
 
         Directives:
         1. Only extract tasks that have been completed.
         2. Strictly ignore any tasks marked as "pending", "to-do", or scheduled for the future.
         3. If a duration or numerical metric is provided, extract it into the metric field.
         4. PRESERVE abbreviations and terminology EXACTLY as written in the input.
-        5. DO NOT expand or modify abbreviations unless absolutely necessary for clarity.
+        5. DO NOT expand or modify abbreviations - keep them as-is.
         6. Treat domain-specific terms (like committee names, internal acronyms) as proper nouns.
+        7. DO NOT invent or add tasks that were not explicitly mentioned in the input.
         """,
             ),
-            ("user", "Raw input: {{raw_input}}"),
+            ("user", "Raw input: {raw_input}"),
         ]
     )
 

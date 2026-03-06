@@ -5,7 +5,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from app.schemas.payload import DailySummaryReport
 from app.ai.state import ReportingState
 from app.core.config import settings
-from app.core.institutional_context import get_institutional_context
 
 
 def summarization_node(state: ReportingState) -> dict:
@@ -21,29 +20,24 @@ def summarization_node(state: ReportingState) -> dict:
 
     structured_llm = llm.with_structured_output(DailySummaryReport)
 
-    # Get institutional context
-    context = get_institutional_context()
-    context_prompt = context.get_context_prompt()
-
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                f"""
-        You are an academic reporting agent. Review the provided list of completed tasks
+                """
+        You are a professional reporting agent. Review the provided list of completed tasks
         and generate a formal Daily Summary Report.
-
-        {context_prompt}
 
         Directives:
         1. Write a concise, professional executive summary (3-4 sentences maximum) detailing the core focus of the day.
         2. Return the identical list of completed activities provided to you, ensuring all data points remain unaltered.
         3. In your executive summary, PRESERVE terminology and abbreviations EXACTLY as they appear in the tasks.
-        4. DO NOT expand abbreviations that are not in the institutional context - keep them as-is.
-        5. Use institutional context ONLY for known terms; treat unknown terms as proper nouns.
+        4. DO NOT expand or modify abbreviations - keep them as written.
+        5. Treat domain-specific terms as proper nouns and preserve them exactly.
+        6. DO NOT add or invent activities beyond what was provided.
         """,
             ),
-            ("user", "Categorized Tasks: {{tasks}}"),
+            ("user", "Categorized Tasks: {tasks}"),
         ]
     )
 

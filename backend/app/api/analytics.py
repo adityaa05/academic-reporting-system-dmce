@@ -69,22 +69,9 @@ async def get_department_metrics(
         report_result = await db.execute(report_count_query)
         total_reports = report_result.scalar() or 0
 
-        # Calculate task distribution across operational domains
-        domain_distribution_query = (
-            select(Task.domain, func.count(Task.id))
-            .join(DailyReport)
-            .join(Professor)
-            .where(func.date(DailyReport.date_submitted) == today)
-            .where(department_filter)
-            .group_by(Task.domain)
-        )
-        domain_result = await db.execute(domain_distribution_query)
-        distribution = {row[0].value: row[1] for row in domain_result.all()}
-
         return {
             "date": today.isoformat(),
             "total_submissions": total_reports,
-            "domain_distribution": distribution,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -122,29 +109,8 @@ async def get_hod_department_stats(
         int((reports_today / total_faculty) * 100) if total_faculty > 0 else 0
     )
 
-    # Top domains (last 7 days)
-    week_ago = today - timedelta(days=7)
-    domain_query = (
-        select(Task.domain, func.count(Task.id).label("count"))
-        .join(DailyReport)
-        .join(Professor)
-        .where(func.date(DailyReport.date_submitted) >= week_ago)
-        .where(department_filter)
-        .group_by(Task.domain)
-        .order_by(func.count(Task.id).desc())
-    )
-    domain_result = await db.execute(domain_query)
-    domain_rows = domain_result.all()
-
-    total_tasks = sum(row.count for row in domain_rows)
-    top_domains = [
-        DomainDistribution(
-            domain=row.domain.value,
-            count=row.count,
-            percentage=round((row.count / total_tasks) * 100, 1) if total_tasks > 0 else 0,
-        )
-        for row in domain_rows
-    ]
+    # Domain categorization removed - not used anymore
+    top_domains = []
 
     # Recent submissions (last 10)
     recent_query = (
