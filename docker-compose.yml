@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./academic_reports.db
+      - SECRET_KEY=your-secret-key-change-in-production
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    volumes:
+      - ./backend:/app
+      - backend-db:/app/data
+
+  frontend:
+    build:
+      context: ./frontend_gradio
+      dockerfile: Dockerfile
+    ports:
+      - "7860:7860"
+    depends_on:
+      - backend
+    environment:
+      - API_BASE_URL=http://backend:8000/api/v1
+
+volumes:
+  backend-db:

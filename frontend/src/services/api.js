@@ -1,7 +1,6 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
   "https://academic-reporting-api-573297019071.asia-south1.run.app/api/v1";
 
 const apiClient = axios.create({
