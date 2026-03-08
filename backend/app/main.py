@@ -35,6 +35,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:7860",
         "http://127.0.0.1:7860",
+        "http://localhost:8080",
+        "https://academic-reporting-streamlit-573297019071.asia-south1.run.app",
     ],
     allow_origin_regex=r"https://.*",
     allow_credentials=True,
